@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gear Shift Trainer</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 10px;
+    }
+    #gearDisplay {
+      font-size: 48px;
+      margin: 20px;
+    }
+    #gearSelectContainer {
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Gangschaltungstrainer</h1>
+  <div id="gearSelectContainer">
+    <label for="gearSelect">Anzahl der Gänge:</label>
+    <select id="gearSelect">
+      <option value="5">5</option>
+      <option value="6" selected>6</option>
+    </select>
+  </div>
+  <!-- This display shows the current gear (Leerlauf, Gang 1, etc.) -->
+  <div id="gearDisplay">Leerlauf</div>
+  <!-- Start and Stop buttons -->
+  <button id="startButton">Start</button>
+  <button id="stopButton" disabled>Stop</button>
+
+  <script>
+    // ----- Global Variables -----
+    let currentGear = 0; // 0 represents neutral (Leerlauf)
+    let simulationInterval = null;
+    // "accelerating" means shifting up one gear; "decelerating" may skip gears.
+    let drivingPhase = "accelerating";
+    let maxGear = 6; // default value; will be updated based on user's selection
+    const gearDisplay = document.getElementById("gearDisplay");
+    const startButton = document.getElementById("startButton");
+    const stopButton = document.getElementById("stopButton");
+    const gearSelect = document.getElementById("gearSelect");
+
+    // ----- Preload Audio Files -----
+    // We preload audio files for gears 1 through 6.
+    // (If the car only has 5 gears, the 6th audio will not be used.)
+    const gearAudios = {};
+    for (let i = 1; i <= 6; i++) {
+      gearAudios[i] = new Audio(`audio/${i}.mp3`);
+    }
+
+    // ----- Update the Gear Display -----
+    function updateDisplay() {
+      if (currentGear === 0) {
+        gearDisplay.textContent = "Leerlauf";
+      } else {
+        gearDisplay.textContent = "Gang " + currentGear;
+      }
+    }
+
+    // ----- Play the Audio for the Current Gear -----
+    function playGearAudio(gear) {
+      if (gearAudios[gear]) {
+        // Restart the audio if it is already playing.
+        gearAudios[gear].currentTime = 0;
+        gearAudios[gear].play();
+      }
+    }
+
+    // ----- Calculate the Next Gear -----
+    // Rules:
+    // • From neutral, shift to gear 1.
+    // • When accelerating, shift up exactly one gear until reaching maxGear.
+    // • When at maxGear (or during deceleration), shift down by a random number of gears.
+    // • If you reach gear 1 during deceleration, switch back to accelerating.
+    function getNextGear() {
+      // Starting from neutral:
+      if (currentGear === 0) {
+        drivingPhase = "accelerating";
+        return 1;
+      }
+
+      // Accelerating: shift up by one, unless at the max.
+      if (drivingPhase === "accelerating") {
+        if (currentGear < maxGear) {
+          return currentGear + 1;
+        } else {
+          // At max gear; start deceleration.
+          drivingPhase = "decelerating";
+          const downshift = Math.floor(Math.random() * (currentGear - 1)) + 1;
+          return Math.max(currentGear - downshift, 1);
+        }
+      } 
+      
+      // Decelerating: drop by a random number of gears.
+      else if (drivingPhase === "decelerating") {
+        if (currentGear > 1) {
+          const downshift = Math.floor(Math.random() * (currentGear - 1)) + 1;
+          const nextGear = Math.max(currentGear - downshift, 1);
+          if (nextGear === 1) {
+            drivingPhase = "accelerating";
+          }
+          return nextGear;
+        } else {
+          // If already at gear 1, start accelerating.
+          drivingPhase = "accelerating";
+          return 2; 
+        }
+      }
+    }
+
+    // ----- Perform One Step of the Simulation -----
+    function simulationStep() {
+      const nextGear = getNextGear();
+      currentGear = nextGear;
+      updateDisplay();
+      playGearAudio(currentGear);
+    }
+
+    // ----- Start the Simulation -----
+    function startSimulation() {
+      // Update maxGear based on the user's selection.
+      maxGear = parseInt(gearSelect.value);
+
+      // Reset simulation state.
+      currentGear = 0;
+      drivingPhase = "accelerating";
+      updateDisplay();
+
+      // Immediately shift to first gear.
+      simulationStep();
+
+      // Schedule subsequent gear shifts (2 to 3 seconds delay).
+      simulationInterval = setInterval(() => {
+        simulationStep();
+      }, 3500 + Math.random() * 1000);
+
+      startButton.disabled = true;
+      stopButton.disabled = false;
+      gearSelect.disabled = true; // Disable selection during simulation.
+    }
+
+    // ----- Stop the Simulation -----
+    function stopSimulation() {
+      clearInterval(simulationInterval);
+      simulationInterval = null;
+      // Reset to neutral.
+      currentGear = 0;
+      updateDisplay();
+      startButton.disabled = false;
+      stopButton.disabled = true;
+      gearSelect.disabled = false; // Re-enable selection.
+    }
+
+    // ----- Button Event Listeners -----
+    startButton.addEventListener("click", startSimulation);
+    stopButton.addEventListener("click", stopSimulation);
+  </script>
+</body>
+</html>
